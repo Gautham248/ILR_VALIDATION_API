@@ -1,4 +1,7 @@
-﻿using ILR_VALIDATION.Domain.Interfaces;
+﻿using Azure.Messaging.ServiceBus;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using ILR_VALIDATION.Domain.Interfaces;
 using ILR_VALIDATION.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -13,33 +16,30 @@ namespace ILR_VALIDATION.Infrastructure.BackgroundServices
     {
         private readonly IMessageQueueService _messageQueueService;
         private readonly IFileStorageService _fileStorageService;
-        private readonly string _resultPath;
+        private readonly BlobServiceClient _blobServiceClient;
+        private readonly string _resultContainer;
 
         public ResultGeneratorService(IMessageQueueService messageQueueService, IFileStorageService fileStorageService, IConfiguration configuration)
         {
             _messageQueueService = messageQueueService;
             _fileStorageService = fileStorageService;
-
-            // Fix: Use the GetSection method to retrieve the value manually
-            var resultPathSection = configuration.GetSection("Storage:ResultPath");
-            _resultPath = resultPathSection.Value ?? "results";
+            var connectionString = configuration.GetSection("Azure:ServiceBusConnection").Value;
+            _blobServiceClient = new BlobServiceClient(connectionString);
+            _resultContainer = configuration.GetSection("Azure:ResultContainer").Value;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (_messageQueueService is MessageQueueService queueService && queueService.TryDequeue(out var referenceId))
+                var referenceId = await _messageQueueService.DequeueAsync(stoppingToken);
+                if (referenceId != null)
                 {
                     await Task.Delay(5000); // Simulate processing time
-                    var resultPath = Path.Combine(_resultPath, $"{referenceId}.json");
-                    var directory = Path.GetDirectoryName(resultPath);
-                    if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                    {
-                        Directory.CreateDirectory(directory);
-                    }
+                    var blobClient = _blobServiceClient.GetBlobContainerClient(_resultContainer).GetBlobClient($"{referenceId}.json");
                     var resultContent = "{\"status\": \"processed\", \"data\": \"example\"}";
-                    await File.WriteAllTextAsync(resultPath, resultContent, Encoding.UTF8);
+                    using var stream = new MemoryStream(Encoding.UTF8.GetBytes(resultContent));
+                    await blobClient.UploadAsync(stream, new BlobUploadOptions());
                 }
                 await Task.Delay(1000); // Check every second
             }

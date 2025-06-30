@@ -4,6 +4,7 @@ using ILR_VALIDATION.Domain.Interfaces;
 using ILR_VALIDATION.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -20,14 +21,16 @@ namespace ILR_VALIDATION.Infrastructure.BackgroundServices
         private readonly IFileStorageService _fileStorageService;
         private readonly BlobServiceClient _blobServiceClient;
         private readonly string _resultContainer;
+        private readonly ILogger<AzureBlobStorageService> _logger;
 
-        public ResultGeneratorService(IMessageQueueService messageQueueService, IFileStorageService fileStorageService, IConfiguration configuration)
+        public ResultGeneratorService(ILogger<AzureBlobStorageService> logger,IMessageQueueService messageQueueService, IFileStorageService fileStorageService, IConfiguration configuration)
         {
             _messageQueueService = messageQueueService;
             _fileStorageService = fileStorageService;
             var sasUrl = configuration["Azure:BlobSasUrl"];
             _blobServiceClient = new BlobServiceClient(new Uri(sasUrl));
             _resultContainer = configuration["Azure:ResultContainer"] ?? "ilrfiles";
+            _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

@@ -13,7 +13,7 @@
 
         public FileStorageService(IConfiguration configuration)
         {
-            // Fixed CS1061 by replacing GetValue with GetSection and Value property
+
             _uploadPath = configuration.GetSection("Storage:UploadPath").Value ?? "uploads";
             _resultPath = configuration.GetSection("Storage:ResultPath").Value ?? "results";
         }

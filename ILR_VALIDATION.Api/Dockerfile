@@ -1,30 +1,32 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER $APP_UID
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-
-
-# This stage is used to build the service project
+# Stage 1: Build
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["ILR_VALIDATION.Api/ILR_VALIDATION.Api.csproj", "ILR_VALIDATION.Api/"]
-RUN dotnet restore "./ILR_VALIDATION.Api/ILR_VALIDATION.Api.csproj"
-COPY . .
-WORKDIR "/src/ILR_VALIDATION.Api"
-RUN dotnet build "./ILR_VALIDATION.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# This stage is used to publish the service project to be copied to the final stage
+# Copy csproj files for dependency restore
+COPY ILR_VALIDATION.Api/ILR_VALIDATION.Api.csproj ILR_VALIDATION.Api/
+COPY ILR_VALIDATION.Application/ILR_VALIDATION.Application.csproj ILR_VALIDATION.Application/
+COPY ILR_VALIDATION.Domain/ILR_VALIDATION.Domain.csproj ILR_VALIDATION.Domain/
+COPY ILR_VALIDATION.Infrastructure/ILR_VALIDATION.Infrastructure.csproj ILR_VALIDATION.Infrastructure/
+
+# Restore dependencies
+RUN dotnet restore ILR_VALIDATION.Api/ILR_VALIDATION.Api.csproj
+
+# Copy all source files
+COPY . .
+
+# Build the app
+WORKDIR /src/ILR_VALIDATION.Api
+RUN dotnet build ILR_VALIDATION.Api.csproj -c $BUILD_CONFIGURATION -o /app/build
+
+# Stage 2: Publish
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./ILR_VALIDATION.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish ILR_VALIDATION.Api.csproj -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
+# Stage 3: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
+EXPOSE 8080
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "ILR_VALIDATION.Api.dll"]

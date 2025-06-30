@@ -17,4 +17,9 @@
 	  <ProjectReference Include="..\ILR_VALIDATION.Infrastructure\ILR_VALIDATION.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="results\" />
+    <Folder Include="uploads\" />
+  </ItemGroup>
+
 </Project>

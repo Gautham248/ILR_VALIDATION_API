@@ -18,6 +18,8 @@ builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 builder.Services.AddSingleton<IFileStorageService, AzureBlobStorageService>();
 builder.Services.AddSingleton<IMessageQueueService, AzureServiceBusQueueService>();
 builder.Services.AddHostedService<ResultGeneratorService>();
+builder.Services.AddSingleton<AzureBlobStorageService>();
+builder.Services.AddLogging();
 
 builder.Services.AddLogging(logging =>
 {

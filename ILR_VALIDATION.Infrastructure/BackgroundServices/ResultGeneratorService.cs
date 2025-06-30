@@ -1,5 +1,4 @@
-﻿using Azure.Messaging.ServiceBus;
-using Azure.Storage.Blobs;
+﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using ILR_VALIDATION.Domain.Interfaces;
 using ILR_VALIDATION.Infrastructure.Services;
@@ -23,9 +22,9 @@ namespace ILR_VALIDATION.Infrastructure.BackgroundServices
         {
             _messageQueueService = messageQueueService;
             _fileStorageService = fileStorageService;
-            var connectionString = configuration.GetSection("Azure:ServiceBusConnection").Value;
-            _blobServiceClient = new BlobServiceClient(connectionString);
-            _resultContainer = configuration.GetSection("Azure:ResultContainer").Value;
+            var sasUrl = configuration["Azure:BlobSasUrl"];
+            _blobServiceClient = new BlobServiceClient(new Uri(sasUrl));
+            _resultContainer = configuration["Azure:ResultContainer"] ?? "ilrfiles";
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -36,7 +35,8 @@ namespace ILR_VALIDATION.Infrastructure.BackgroundServices
                 if (referenceId != null)
                 {
                     await Task.Delay(5000); // Simulate processing time
-                    var blobClient = _blobServiceClient.GetBlobContainerClient(_resultContainer).GetBlobClient($"{referenceId}.json");
+                    var containerClient = _blobServiceClient.GetBlobContainerClient(_resultContainer);
+                    var blobClient = containerClient.GetBlobClient($"{referenceId}.json");
                     var resultContent = "{\"status\": \"processed\", \"data\": \"example\"}";
                     using var stream = new MemoryStream(Encoding.UTF8.GetBytes(resultContent));
                     await blobClient.UploadAsync(stream, new BlobUploadOptions());

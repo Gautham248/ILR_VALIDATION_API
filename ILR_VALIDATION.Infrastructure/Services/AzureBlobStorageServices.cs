@@ -3,10 +3,8 @@ using Azure.Storage.Blobs.Models;
 using ILR_VALIDATION.Domain.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using Microsoft.Extensions.Logging;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace ILR_VALIDATION.Infrastructure.Services
@@ -17,34 +15,29 @@ namespace ILR_VALIDATION.Infrastructure.Services
         private readonly string _uploadContainer;
         private readonly string _resultContainer;
 
-        public AzureBlobStorageService(IConfiguration configuration)
+        private readonly ILogger<AzureBlobStorageService> _logger;
+        public AzureBlobStorageService(IConfiguration configuration, ILogger<AzureBlobStorageService> logger)
         {
-            // Use GetSection and Value property instead of GetValue
-            var connectionString = configuration.GetSection("Azure:BlobConnectionString").Value;
-            _blobServiceClient = new BlobServiceClient(connectionString);
-            _uploadContainer = configuration.GetSection("Azure:UploadContainer").Value ?? "uploads";
-            _resultContainer = configuration.GetSection("Azure:ResultContainer").Value ?? "results";
-            InitializeContainers();
-        }
-
-        private void InitializeContainers()
-        {
-            _blobServiceClient.GetBlobContainerClient(_uploadContainer).CreateIfNotExists();
-            _blobServiceClient.GetBlobContainerClient(_resultContainer).CreateIfNotExists();
+            _logger = logger;
+            var sasUrl = configuration["Azure:BlobSasUrl"];
+            _logger.LogInformation("Initializing with SAS URL: {SasUrl}", sasUrl);
+            _blobServiceClient = new BlobServiceClient(new Uri(sasUrl));
+            _uploadContainer = configuration["Azure:UploadContainer"] ?? "ilrfiles";
+            _resultContainer = configuration["Azure:ResultContainer"] ?? "ilrfiles";
         }
 
         public async Task SaveFileAsync(IFormFile file, string filePath)
         {
-            var container = _blobServiceClient.GetBlobContainerClient(filePath.StartsWith("uploads") ? _uploadContainer : _resultContainer);
-            var blobClient = container.GetBlobClient(Path.GetFileName(filePath));
+            var containerClient = _blobServiceClient.GetBlobContainerClient(_uploadContainer);
+            var blobClient = containerClient.GetBlobClient(Path.GetFileName(filePath));
             using var stream = file.OpenReadStream();
             await blobClient.UploadAsync(stream, new BlobUploadOptions());
         }
 
         public async Task<string?> ReadFileAsync(string filePath)
         {
-            var container = _blobServiceClient.GetBlobContainerClient(filePath.StartsWith("results") ? _resultContainer : _uploadContainer);
-            var blobClient = container.GetBlobClient(Path.GetFileName(filePath));
+            var containerClient = _blobServiceClient.GetBlobContainerClient(_resultContainer);
+            var blobClient = containerClient.GetBlobClient(Path.GetFileName(filePath));
             if (await blobClient.ExistsAsync())
             {
                 var response = await blobClient.DownloadContentAsync();
@@ -55,8 +48,8 @@ namespace ILR_VALIDATION.Infrastructure.Services
 
         public Task<bool> FileExistsAsync(string filePath)
         {
-            var container = _blobServiceClient.GetBlobContainerClient(filePath.StartsWith("results") ? _resultContainer : _uploadContainer);
-            var blobClient = container.GetBlobClient(Path.GetFileName(filePath));
+            var containerClient = _blobServiceClient.GetBlobContainerClient(_resultContainer);
+            var blobClient = containerClient.GetBlobClient(Path.GetFileName(filePath));
             return blobClient.ExistsAsync().ContinueWith(task => task.Result.Value);
         }
     }

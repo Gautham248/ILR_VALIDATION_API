@@ -1,9 +1,9 @@
 ﻿using ILR_VALIDATION.Application.Commands;
-using ILR_VALIDATION.Application.Queries;
+using ILR_VALIDATION.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 
 namespace ILR_VALIDATION.Api.Controllers
 {
@@ -12,53 +12,45 @@ namespace ILR_VALIDATION.Api.Controllers
     public class FileController : ControllerBase
     {
         private readonly IMediator _mediator;
-        private readonly ILogger<FileController> _logger;
+        private readonly IFileStorageService _fileStorageService;
 
-        public FileController(IMediator mediator, ILogger<FileController> logger)
+        public FileController(IMediator mediator, IFileStorageService fileStorageService)
         {
             _mediator = mediator;
-            _logger = logger;
+            _fileStorageService = fileStorageService;
         }
 
         [HttpPost("upload")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> UploadFile(IFormFile file)
+        public async Task<IActionResult> Upload(IFormFile file)
         {
-            _logger.LogInformation("Received file upload request for file: {FileName}", file?.FileName);
-            if (file == null || file.Length == 0)
-            {
-                _logger.LogWarning("No file uploaded.");
-                return BadRequest("No file uploaded.");
-            }
-
-            if (!file.FileName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.LogWarning("Invalid file type uploaded: {FileName}", file.FileName);
-                return BadRequest("Only XML files are allowed.");
-            }
-
             var command = new UploadFileCommand { File = file };
             var result = await _mediator.Send(command);
-            _logger.LogInformation("File uploaded successfully with ReferenceId: {ReferenceId}", result.ReferenceId);
             return Ok(result);
         }
 
         [HttpGet("status/{referenceId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetFileStatus(string referenceId)
+        public async Task<IActionResult> GetStatus(string referenceId)
         {
-            _logger.LogInformation("Checking status for ReferenceId: {ReferenceId}", referenceId);
-            var query = new StatusCheckQuery { ReferenceId = referenceId };
-            var result = await _mediator.Send(query);
-            if (result == null)
+            var filePath = $"ilrfiles/{referenceId}.json"; // Path to the JSON result file
+            var status = "InProgress"; // Default status
+
+            if (await _fileStorageService.FileExistsAsync(filePath))
             {
-                _logger.LogWarning("Status check failed for ReferenceId: {ReferenceId}", referenceId);
-                return NotFound();
+                status = "Completed";
+                var jsonContent = await _fileStorageService.ReadFileAsync(filePath);
+                if (jsonContent != null)
+                {
+                    return Content(jsonContent, "application/json");
+                }
             }
-            _logger.LogInformation("Status retrieved for ReferenceId: {ReferenceId}, Status: {Status}", referenceId, result.Status);
-            return Ok(result);
+
+            return Ok(new
+            {
+                referenceId,
+                fileName = (string?)null,
+                filePath = (string?)null,
+                status
+            });
         }
     }
 }

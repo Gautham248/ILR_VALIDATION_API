@@ -17,7 +17,7 @@ namespace ILR_VALIDATION.Infrastructure.Services
 
         public AzureServiceBusQueueService(IConfiguration configuration)
         {
-            // Fixed the error by using GetSection and Value property  
+          
             var connectionString = configuration.GetSection("Azure:ServiceBusConnection").Value;
             _serviceBusClient = new ServiceBusClient(connectionString);
             _sender = _serviceBusClient.CreateSender("ilr-xml-process-queue");

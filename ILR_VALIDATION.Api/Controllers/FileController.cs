@@ -31,8 +31,8 @@ namespace ILR_VALIDATION.Api.Controllers
         [HttpGet("status/{referenceId}")]
         public async Task<IActionResult> GetStatus(string referenceId)
         {
-            var filePath = $"ilrfiles/{referenceId}.json"; // Path to the JSON result file
-            var status = "InProgress"; // Default status
+            var filePath = $"ilrfiles/{referenceId}.json";
+            var status = "InProgress"; 
 
             if (await _fileStorageService.FileExistsAsync(filePath))
             {

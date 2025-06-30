@@ -37,11 +37,11 @@ namespace ILR_VALIDATION.Infrastructure.BackgroundServices
                 var referenceId = await _messageQueueService.DequeueAsync(stoppingToken);
                 if (referenceId != null)
                 {
-                    await Task.Delay(5000); // Simulate processing time
+                    await Task.Delay(5000); 
                     var containerClient = _blobServiceClient.GetBlobContainerClient(_resultContainer);
                     var blobClient = containerClient.GetBlobClient($"{referenceId}.json");
 
-                    // Generate sample validation errors
+            
                     var validationErrors = GenerateValidationErrors(referenceId);
                     var resultContent = JsonConvert.SerializeObject(new
                     {
@@ -52,17 +52,17 @@ namespace ILR_VALIDATION.Infrastructure.BackgroundServices
                     using var stream = new MemoryStream(Encoding.UTF8.GetBytes(resultContent));
                     await blobClient.UploadAsync(stream, new BlobUploadOptions());
                 }
-                await Task.Delay(1000); // Check every second
+                await Task.Delay(1000); 
             }
         }
 
         private List<ValidationError> GenerateValidationErrors(string referenceId)
         {
             var errors = new List<ValidationError>();
-            var baseLearnRefNumber = referenceId.Replace("-", "").Substring(0, 6); // Extract base for uniqueness
+            var baseLearnRefNumber = referenceId.Replace("-", "").Substring(0, 6);
             var random = new Random();
 
-            // Sample data generation (simplified)
+            
             string[] learnerNames = { "John Smith", "Aisha Khan", "Raj Mehta", "Emily Brown", "Mohammed Ali",
                                      "Chloe Martin", "David Lee", "Sophia Wilson", "Liam Patel", "Isla Green",
                                      "Ethan Walker", "Olivia Thomas" };

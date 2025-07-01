@@ -21,89 +21,107 @@ namespace ILR_VALIDATION.Infrastructure.BackgroundServices
         private readonly IFileStorageService _fileStorageService;
         private readonly BlobServiceClient _blobServiceClient;
         private readonly string _resultContainer;
-        private readonly ILogger<AzureBlobStorageService> _logger;
+        private readonly ILogger<ResultGeneratorService> _logger; // Corrected logger type
 
-        public ResultGeneratorService(ILogger<AzureBlobStorageService> logger,IMessageQueueService messageQueueService, IFileStorageService fileStorageService, IConfiguration configuration)
+        public ResultGeneratorService(ILogger<ResultGeneratorService> logger, IMessageQueueService messageQueueService, IFileStorageService fileStorageService, IConfiguration configuration)
         {
-            _messageQueueService = messageQueueService;
-            _fileStorageService = fileStorageService;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _messageQueueService = messageQueueService ?? throw new ArgumentNullException(nameof(messageQueueService));
+            _fileStorageService = fileStorageService ?? throw new ArgumentNullException(nameof(fileStorageService));
             var sasUrl = configuration["Azure:BlobSasUrl"];
-            _blobServiceClient = new BlobServiceClient(new Uri(sasUrl));
+            _blobServiceClient = new BlobServiceClient(new Uri(sasUrl)) ?? throw new ArgumentNullException(nameof(sasUrl));
             _resultContainer = configuration["Azure:ResultContainer"] ?? "ilrfiles";
-            _logger = logger;
+            _logger.LogInformation("Initializing ResultGeneratorService with SAS URL: {SasUrl}, ResultContainer: {ResultContainer}", sasUrl, _resultContainer);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            _logger.LogInformation("ResultGeneratorService started, waiting for messages...");
             while (!stoppingToken.IsCancellationRequested)
             {
                 var referenceId = await _messageQueueService.DequeueAsync(stoppingToken);
                 if (referenceId != null)
                 {
-                    await Task.Delay(5000); 
+                    _logger.LogInformation("Processing referenceId: {ReferenceId}", referenceId);
+                    await Task.Delay(5000); // Simulate processing time
                     var containerClient = _blobServiceClient.GetBlobContainerClient(_resultContainer);
                     var blobClient = containerClient.GetBlobClient($"{referenceId}.json");
 
-            
-                    var validationErrors = GenerateValidationErrors(referenceId);
-                    var resultContent = JsonConvert.SerializeObject(new
+                    try
                     {
-                        referenceId,
-                        ValidationErrors = validationErrors
-                    });
+                        var resultData = GenerateResultData(referenceId);
+                        var resultContent = JsonConvert.SerializeObject(resultData);
+                        _logger.LogInformation("Generated result content: {Content}", resultContent);
 
-                    using var stream = new MemoryStream(Encoding.UTF8.GetBytes(resultContent));
-                    await blobClient.UploadAsync(stream, new BlobUploadOptions());
+                        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(resultContent));
+                        await blobClient.UploadAsync(stream, new BlobUploadOptions());
+                        _logger.LogInformation("Result uploaded successfully for referenceId: {ReferenceId}", referenceId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to generate or upload result for referenceId: {ReferenceId}", referenceId);
+                        throw;
+                    }
                 }
-                await Task.Delay(1000); 
+                await Task.Delay(1000); // Check every second
             }
         }
 
-        private List<ValidationError> GenerateValidationErrors(string referenceId)
+        private object GenerateResultData(string referenceId)
         {
-            var errors = new List<ValidationError>();
-            var baseLearnRefNumber = referenceId.Replace("-", "").Substring(0, 6);
+            var results = new List<ResultItem>();
             var random = new Random();
+            int id = 1947; // Static ID as per sample, can be made dynamic if needed
 
-            
-            string[] learnerNames = { "John Smith", "Aisha Khan", "Raj Mehta", "Emily Brown", "Mohammed Ali",
-                                     "Chloe Martin", "David Lee", "Sophia Wilson", "Liam Patel", "Isla Green",
-                                     "Ethan Walker", "Olivia Thomas" };
-            string[] pmukprns = { "12345678", "87654321" };
-            string[] severities = { "Error", "Warning", "Success" };
+            string[] learnerNames = { "Jane Smith", "Louise Jones", "Mark Jones", "Smith John", "Jane Smith", "Parker Steve" };
+            string[] learnerRefNumbers = { "18Learner", "CLLearner", "OtherAdult", "Levy", "TLevelT", "SBLearnerEV" };
+            string[] severities = { "Error", "Warning" };
             string[] messages = {
-                  "Date of birth must not be in the future.",
-                  "Planned learning hours are unusually high.",
-                  "Funding model not valid for the learner's age.",
-                  "Missing end date for learning delivery.",
-                  "The data is valid."
+                  "GCSE maths qualification grade must be 'NONE'",
+                  "This Unique learner number should not be used",
+                  "The Unique learner number does not pass the checksum calculation",
+                  "The Planned learning hours have not been returned",
+                  "The GCSE maths qualification grade has not been returned",
+                  "The Primary LLDD and health problem is not recorded on one of the LLDD and health problem records"
               };
-            string[] ruleIds = { "DOB_01", "PLH_05", "FUND_12", "ENDDATE_02" };
+            string[] ruleIds = { "MathGrade_04", "ULN_02", "ULN_04", "PlanLearnHours_01", "MathGrade_01", "PrimaryLLDD_01" };
 
-            for (int i = 0; i < 12; i++)
+            for (int i = 0; i < learnerNames.Length; i++)
             {
-                errors.Add(new ValidationError
+                results.Add(new ResultItem
                 {
                     LearnerName = learnerNames[i],
-                    LearnRefNumber = $"{baseLearnRefNumber}{i:000}",
-                    PMUKPRN = pmukprns[random.Next(pmukprns.Length)],
+                    LearnerRefNumber = learnerRefNumbers[i],
+                    PMUKPRN = 0, // Static value as per sample
                     Severity = severities[random.Next(severities.Length)],
-                    Message = messages[random.Next(messages.Length)],
-                    RuleID = ruleIds[random.Next(ruleIds.Length)]
+                    Message = messages[i],
+                    RuleId = ruleIds[i]
                 });
             }
 
-            return errors;
+            return new
+            {
+                Result = results,
+                Id = id,
+                Exception = (string)null,
+                Status = 5,
+                IsCanceled = false,
+                IsCompleted = true,
+                IsCompletedSuccessfully = true,
+                CreationOptions = 0,
+                AsyncState = (string)null,
+                IsFaulted = false
+            };
         }
     }
 
-    public class ValidationError
+    public class ResultItem
     {
         public string LearnerName { get; set; }
-        public string LearnRefNumber { get; set; }
-        public string PMUKPRN { get; set; }
+        public string LearnerRefNumber { get; set; }
+        public int PMUKPRN { get; set; }
         public string Severity { get; set; }
         public string Message { get; set; }
-        public string RuleID { get; set; }
+        public string RuleId { get; set; }
     }
 }

@@ -42,7 +42,7 @@ namespace ILR_VALIDATION.Api.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error uploading file.");
-                return StatusCode(500, "An error occurred while uploading the file. Check server logs for details.");
+                return StatusCode(500, "An error occurred while uploading the file. Check server logs for details."+ex.Message);
             }
         }
 

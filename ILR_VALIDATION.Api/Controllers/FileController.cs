@@ -55,25 +55,34 @@ namespace ILR_VALIDATION.Api.Controllers
                 return BadRequest("ReferenceId is required.");
             }
 
-            var filePath = $"ilrfiles/{referenceId}.json";
+            var filePath = $"{referenceId}.json";
             var status = "InProgress";
 
             try
             {
-                if (await _fileStorageService.FileExistsAsync(filePath))
+                _logger.LogInformation("Starting status check for referenceId: {ReferenceId}, FilePath: {FilePath}", referenceId, filePath);
+                bool fileExists = await _fileStorageService.FileExistsAsync(filePath);
+                _logger.LogInformation("File existence check result for {FilePath}: {Exists}, Container: {_resultContainer}", filePath, fileExists, _fileStorageService.GetType().GetProperty("ContainerName")?.GetValue(_fileStorageService));
+
+                if (fileExists)
                 {
                     status = "Completed";
                     var jsonContent = await _fileStorageService.ReadFileAsync(filePath);
+                    _logger.LogInformation("Read JSON content for {FilePath}: {Content}", filePath, jsonContent ?? "null");
+
                     if (jsonContent != null)
                     {
-                        _logger.LogInformation("Status check successful for referenceId: {ReferenceId}", referenceId);
+                        _logger.LogInformation("Returning JSON content for referenceId: {ReferenceId}", referenceId);
                         return Content(jsonContent, "application/json");
                     }
-                    _logger.LogWarning("JSON content is null for referenceId: {ReferenceId}", referenceId);
+                    else
+                    {
+                        _logger.LogWarning("JSON content is null for referenceId: {ReferenceId}", referenceId);
+                    }
                 }
                 else
                 {
-                    _logger.LogInformation("Status is InProgress for referenceId: {ReferenceId}", referenceId);
+                    _logger.LogInformation("No file found for referenceId: {ReferenceId}", referenceId);
                 }
 
                 return Ok(new

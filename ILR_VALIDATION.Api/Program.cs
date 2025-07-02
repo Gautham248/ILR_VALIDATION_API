@@ -1,5 +1,5 @@
 using ILR_VALIDATION.Domain.Interfaces;
-using ILR_VALIDATION.Infrastructure.BackgroundServices;
+//using ILR_VALIDATION.Infrastructure.BackgroundServices;
 using ILR_VALIDATION.Infrastructure.Services;
 using Microsoft.ApplicationInsights.Extensibility; 
 using Microsoft.AspNetCore.Builder;
@@ -20,7 +20,7 @@ builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 builder.Services.AddSingleton<IFileStorageService, AzureBlobStorageService>();
 builder.Services.AddSingleton<AzureBlobStorageService>();
 builder.Services.AddSingleton<IMessageQueueService, AzureServiceBusQueueService>();
-builder.Services.AddHostedService<ResultGeneratorService>();
+//builder.Services.AddHostedService<ResultGeneratorService>();
 
 builder.Services.AddLogging(logging =>
 {

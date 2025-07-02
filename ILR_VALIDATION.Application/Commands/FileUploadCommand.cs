@@ -33,7 +33,7 @@ namespace ILR_VALIDATION.Application.Commands
                 FileName = request.File.FileName,
                 FilePath = filePath
             };
-            await _messageQueueService.EnqueueAsync(referenceId);
+            await _messageQueueService.EnqueueAsync($"{referenceId}.xml");
             return fileReference;
         }
     }
